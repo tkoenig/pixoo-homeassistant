@@ -57,6 +57,18 @@ instance.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://m
 **List of pages in YAML:** See below (Optional)
   
 
+### Pixoo-64 II API compatibility
+
+The integration tries the legacy `/post` endpoint first, then port `9000` at
+`/divoom_api`. It accepts both `error_code` and `ReturnCode` responses. If the
+newer API acknowledges `Draw/GetHttpGifId` without returning `PicId`, the
+integration resets the drawing ID and maintains the counter locally.
+
+Some Pixoo-64 II firmware does not report screen power or brightness. These
+values remain unknown until set through Home Assistant, then reflect the last
+successful command (assumed state). Changes made in the Divoom app or on the
+device cannot be reflected unless the API reports them.
+
 # Page Types & Configurations
 
   

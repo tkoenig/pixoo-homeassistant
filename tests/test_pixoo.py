@@ -44,6 +44,44 @@ class TestPixoo(unittest.TestCase):
             m.request_history[-1].json()
         )
 
+    def test_pixoo_64_ii_uses_local_counter_and_accepts_commands(self, m):
+        m.post(self.primary_url, exc=requests.exceptions.ConnectionError)
+        m.post(self.fallback_url, json={"ReturnCode": 0})
+
+        pixoo = Pixoo(IP_ADDRESS)
+        pixoo.set_brightness(42)
+        pixoo.push()
+        pixoo.push()
+
+        commands = [request.json() for request in m.request_history[1:]]
+        self.assertEqual('Draw/ResetHttpGifId', commands[1]['Command'])
+        self.assertEqual([1, 2], [command['PicID'] for command in commands if 'PicID' in command])
+        self.assertEqual({'Command': 'Channel/SetBrightness', 'Brightness': 42}, commands[2])
+        self.assertIsNone(pixoo.get_state())
+        self.assertIsNone(pixoo.get_brightness())
+
+    def test_reads_legacy_status(self, m):
+        m.post(self.primary_url, json={"error_code": 0, "PicId": 0, "LightSwitch": 0, "Brightness": 42})
+        pixoo = Pixoo(IP_ADDRESS)
+
+        self.assertFalse(pixoo.get_state())
+        self.assertEqual(42, pixoo.get_brightness())
+
+    def test_rejects_failed_or_missing_result_codes(self, m):
+        m.post(self.primary_url, json={"error_code": 0, "PicId": 0})
+        pixoo = Pixoo(IP_ADDRESS)
+
+        for response, error in [
+            ({"ReturnCode": 1, "ReturnMessage": "command timeout"}, RuntimeError),
+            ({"error_code": 1}, RuntimeError),
+            ({}, ValueError),
+            ({"ReturnCode": 0.5}, ValueError),
+        ]:
+            with self.subTest(response=response):
+                m.post(self.primary_url, json=response)
+                with self.assertRaises(error):
+                    pixoo.set_screen(True)
+
     def test_falls_back_to_divoom_api_when_primary_connection_fails(self, m):
         fake_response = {"error_code": 0, "PicId": 0}
         m.post(self.primary_url, exc=requests.exceptions.ConnectTimeout)

@@ -50,6 +50,30 @@ class TestDivoomLight(unittest.TestCase):
         self.assertTrue(self.light.is_on)
         self.assertEqual(255, self.light.brightness)
 
+    def test_missing_status_keeps_successful_commands(self):
+        self.pixoo.get_state.return_value = None
+        self.pixoo.get_brightness.return_value = None
+
+        self.light.update()
+        self.assertTrue(self.light.available)
+        self.assertTrue(self.light.assumed_state)
+        self.assertIsNone(self.light.is_on)
+        self.assertIsNone(self.light.brightness)
+
+        self.light.turn_on(brightness=37)
+        self.light.update()
+        self.assertTrue(self.light.is_on)
+        self.assertEqual(37, self.light.brightness)
+        self.light.turn_off()
+        self.light.update()
+        self.assertFalse(self.light.is_on)
+
+    def test_failed_command_does_not_change_state(self):
+        self.pixoo.set_screen.side_effect = RuntimeError("command timeout")
+        with self.assertRaises(RuntimeError):
+            self.light.turn_on()
+        self.assertIsNone(self.light.is_on)
+
     def test_supported_color_modes(self):
         self.assertEqual(ColorMode.BRIGHTNESS, self.light.supported_color_modes.pop())
 

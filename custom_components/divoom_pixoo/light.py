@@ -49,11 +49,12 @@ class DivoomLight(LightEntity):
 
     def _set_on_with_kwargs(self, kwargs):
         if ATTR_BRIGHTNESS in kwargs:
-            self._brightness = kwargs[ATTR_BRIGHTNESS]
-            brightness_percent = int((self._brightness / 255.0) * 100)
+            brightness = kwargs[ATTR_BRIGHTNESS]
+            brightness_percent = int((brightness / 255.0) * 100)
             self._pixoo.set_brightness(brightness_percent)
-        self._state = True
+            self._brightness = brightness
         self._pixoo.set_screen(True)
+        self._state = True
 
     def turn_off(self, **kwargs):
         self._set_off()
@@ -62,8 +63,8 @@ class DivoomLight(LightEntity):
         await self.hass.async_add_executor_job(self._set_off)
 
     def _set_off(self):
-        self._state = False
         self._pixoo.set_screen(False)
+        self._state = False
 
     def update(self) -> None:
         self._update_state()
@@ -73,9 +74,14 @@ class DivoomLight(LightEntity):
 
     def _update_state(self) -> None:
         try:
-            self._state = self._pixoo.get_state()
+            state = self._pixoo.get_state()
             brightness_percent = self._pixoo.get_brightness()
-            self._brightness = int((brightness_percent / 100.0) * 255)
+            # Pixoo-64 II omits these fields; retain only successfully set values.
+            self._attr_assumed_state = state is None or brightness_percent is None
+            if state is not None:
+                self._state = state
+            if brightness_percent is not None:
+                self._brightness = int((brightness_percent / 100.0) * 255)
             self._set_available(True)
         except Exception as err:
             _LOGGER.debug("Unable to update light state: %s", err)
